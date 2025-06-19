@@ -1,0 +1,13 @@
+streamlit
+streamlit-folium
+geopandas
+pandas
+folium
+altair
+mapclassify
+shapely
+plotly
+numpy
+requests
+fsspec
+pyogrio
