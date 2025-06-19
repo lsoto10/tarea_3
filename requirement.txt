@@ -8,3 +8,6 @@ mapclassify
 shapely
 plotly
 numpy
+requests
+fsspec
+pyogrio

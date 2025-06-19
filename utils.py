@@ -2,10 +2,6 @@ import geopandas as gpd
 import pandas as pd
 import streamlit as st
 import numpy as np
-# Nuevas librerías necesarias para cargar datos desde URLs y Zips
-import requests
-import zipfile
-import io
 
 def _normaliza_cod(gdf, posibles, nuevo):
     """Renombra la primera columna encontrada en `posibles` a `nuevo`."""
@@ -23,50 +19,26 @@ def _normaliza_cod(gdf, posibles, nuevo):
 def cargar_datos():
     """Carga y procesa todos los datos necesarios para la aplicación desde URLs."""
     try:
-        # --- URLs de tus archivos en GitHub Releases ---
-        # He asumido que crearás los .zip como se recomienda.
-        # Si no lo haces, la carga de shapefiles fallará.
-        # ¡RECUERDA USAR LA URL DE TU DATASET REDUCIDO!
         URL_CENSO_CSV = "https://github.com/lsoto10/tarea_3/releases/download/data/Microdato_Censo2017-Personas.csv"
         URL_REGIONES_ZIP = "https://github.com/lsoto10/tarea_3/releases/download/data/Regiones.zip"
         URL_COMUNAS_ZIP = "https://github.com/lsoto10/tarea_3/releases/download/data/Comunas.zip"
 
-        # --- 1. Geometrías (Cargando desde URL de un ZIP) ---
-        
-        # Función auxiliar para cargar shapefile desde una URL de un zip
-        def cargar_shapefile_desde_zip(url):
-            try:
-                # Descargar el contenido del archivo zip
-                response = requests.get(url)
-                response.raise_for_status()  # Lanza un error si la descarga falla (ej. 404 Not Found)
-                
-                # Geopandas puede leer directamente desde los bytes de un zip
-                # Usamos io.BytesIO para tratar los bytes descargados como un archivo en memoria
-                return gpd.read_file(io.BytesIO(response.content))
-
-            except Exception as e:
-                st.error(f"Error al cargar el shapefile desde la URL: {url}\nDetalle: {e}")
-                st.info("Asegúrate de que la URL es correcta y que el archivo es un .zip que contiene un shapefile válido.")
-                st.stop()
-
+        # --- 1. Geometrías (Cargando desde URL de un ZIP con subcarpetas) ---
         st.info("Cargando geometrías de regiones...")
-        regiones = cargar_shapefile_desde_zip(URL_REGIONES_ZIP).to_crs(4326)
+        regiones = gpd.read_file(f"zip+{URL_REGIONES_ZIP}!Regiones/Regional.shp").to_crs(4326)
         
         st.info("Cargando geometrías de comunas...")
-        comunas = cargar_shapefile_desde_zip(URL_COMUNAS_ZIP).to_crs(4326)
+        # LÍNEA CORREGIDA:
+        comunas = gpd.read_file(f"zip+{URL_COMUNAS_ZIP}!Comunas/comunas.shp").to_crs(4326)
 
-        # Normalizar nombres de columnas (tu código original, está perfecto)
+        # Normalizar nombres de columnas
         regiones = _normaliza_cod(regiones,
-                    ["codregion","REGION","REGION_C","COD_REG","COD_REGION",
-                     "REGIONCOD"], "region_id")
-
+                    ["codregion","REGION","REGION_C","COD_REG","COD_REGION", "REGIONCOD"], "region_id")
         comunas = _normaliza_cod(comunas,
-                    ["cod_comuna","COMUNA","COD_COMUNA","COMUNA_COD",
-                     "Cod_Comun","ID_COMUNA"], "comuna_id")
+                    ["cod_comuna","COMUNA","COD_COMUNA","COMUNA_COD", "Cod_Comun","ID_COMUNA"], "comuna_id")
         
         if 'codregion' in comunas.columns:
             comunas = comunas.rename(columns={'codregion': 'region_id_com'})
-        
         if 'Region' in regiones.columns:
             regiones['region_nombre'] = regiones['Region'].str.strip()
         if 'Comuna' in comunas.columns:
@@ -76,19 +48,14 @@ def cargar_datos():
 
         # --- 2. Censo (OPTIMIZADO desde URL) ---
         st.info("Cargando datos del censo (esto puede tardar un momento)...")
-        col_map = {"REGION": "region_id", "COMUNA": "comuna_id",
-                   "P08": "sexo", "P09": "edad", "P16": "trabajo",
-                   "ESCOLARIDAD": "escolaridad"}
+        col_map = {"REGION": "region_id", "COMUNA": "comuna_id", "P08": "sexo", 
+                   "P09": "edad", "P16": "trabajo", "ESCOLARIDAD": "escolaridad"}
         
-        # Cargar directamente desde la URL. El chunking funciona igual.
-        censo_iterator = pd.read_csv(URL_CENSO_CSV,
-                                     sep=";", encoding="latin1",
+        censo_iterator = pd.read_csv(URL_CENSO_CSV, sep=";", encoding="latin1",
                                      usecols=col_map.keys(),
-                                     dtype={"REGION": "int8", "COMUNA": "int32",
-                                            "P08": "uint8", "P09": "uint8"},
+                                     dtype={"REGION": "int8", "COMUNA": "int32", "P08": "uint8", "P09": "uint8"},
                                      chunksize=500000)
         
-        # Procesar en chunks (tu código original, está perfecto)
         censo_chunks = []
         for chunk in censo_iterator:
             chunk = chunk.rename(columns=col_map)
@@ -101,7 +68,7 @@ def cargar_datos():
         censo = pd.concat(censo_chunks, ignore_index=True)
         del censo_chunks
 
-        # Convertir tipos de datos (tu código original, está perfecto)
+        # Convertir tipos de datos
         try:
             regiones['region_id'] = pd.to_numeric(regiones['region_id'], errors='coerce').astype('int8')
             comunas['comuna_id'] = pd.to_numeric(comunas['comuna_id'], errors='coerce').astype('int32')
@@ -118,11 +85,19 @@ def cargar_datos():
         st.error(f"Ocurrió un error crítico durante la carga de datos: {e}")
         st.stop()
 
-
-# ==============================================================================
-# EL RESTO DE TUS FUNCIONES ESTÁN PERFECTAS Y NO NECESITAN CAMBIOS
-# Las pego aquí para que tengas el archivo completo.
-# ==============================================================================
+@st.cache_data
+def procesar_datos_comuna(censo, region_id=None):
+    if region_id:
+        censo_filtrado = censo[censo['region_id'] == region_id]
+    else:
+        censo_filtrado = censo
+    datos_comuna = censo_filtrado.groupby('comuna_id').agg({
+        'sexo': 'count',
+        'edad': ['mean', 'median'],
+        'sexo_cat': lambda x: (x == 'Mujer').sum() / len(x) * 100,
+    }).round(2)
+    datos_comuna.columns = ['poblacion_total', 'edad_promedio', 'edad_mediana', 'pct_mujeres']
+    return datos_comuna.reset_index()
 
 @st.cache_data
 def procesar_datos_comuna(censo, region_id=None):
