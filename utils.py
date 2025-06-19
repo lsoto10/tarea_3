@@ -20,8 +20,8 @@ def cargar_datos():
     """Carga y procesa todos los datos necesarios para la aplicación."""
     try:
         # ── 1. Geometrías ───────────────────────────────
-        regiones = gpd.read_file("data/Regiones/Regional.shp").to_crs(4326)
-        comunas = gpd.read_file("data/Comunas/comunas.shp").to_crs(4326)
+        regiones = gpd.read_file("sha256:09660da949e7dbe68787f6956e669810a276749749b46fc7fbf01790a3f2420a").to_crs(4326)
+        comunas = gpd.read_file("sha256:22422225a10a2df817f386f6d0a45652d14d76fad28c9b85c17da4c1edaaa755").to_crs(4326)
 
         # Normalizar nombres de columnas
         regiones = _normaliza_cod(regiones,
@@ -50,7 +50,7 @@ def cargar_datos():
                    "ESCOLARIDAD": "escolaridad"}
         
         # Cargar con muestreo para mejor rendimiento
-        censo = pd.read_csv("data/Microdato_Censo2017-Personas.csv",
+        censo = pd.read_csv("sha256:178b25c23281b9d873db2c09814bc2ff49a1c6ac64ff1eb033bc019a5b8924ab",
                            sep=";", encoding="latin1",
                            usecols=col_map.keys(),
                            dtype={"REGION": "int8", "COMUNA": "int32",
