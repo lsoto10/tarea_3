@@ -1,0 +1,25 @@
+[server]
+# Increase message size limit for maps (set to 500MB)
+maxMessageSize = 500
+
+# Other performance optimizations
+maxUploadSize = 500
+enableCORS = false
+enableXsrfProtection = false
+
+[theme]
+# Set theme colors
+primaryColor = "#2196F3"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+
+[runner]
+# Performance optimizations
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+
+[browser]
+# Browser optimizations
+gatherUsageStats = false

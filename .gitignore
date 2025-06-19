@@ -1,0 +1,11 @@
+# Ignorar carpetas de datos y archivos grandes
+/data/
+/ficheros.zip
+
+# Archivos de sistema y de entorno de Python
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+venv/
+.idea/
